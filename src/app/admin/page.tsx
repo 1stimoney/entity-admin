@@ -11,6 +11,8 @@ import {
   Wallet,
   ReceiptText,
   Gift,
+  Coins,
+  Clock3,
 } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
@@ -40,6 +42,14 @@ type WithdrawalRow = {
   bank_name: string | null
 }
 
+type PayoutRow = {
+  id: string
+  created_at: string
+  amount: number | null
+  user_id: string
+  investment_id: string
+}
+
 function fmtNGN(n: number) {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
@@ -67,14 +77,12 @@ export default async function AdminHomePage() {
         getAll() {
           return cookieStore.getAll()
         },
-        // Pages can’t set cookies from a Server Component render.
-        // Middleware + route handlers handle refreshing sessions.
         setAll() {},
       },
     }
   )
 
-  // ---- Stats (safe defaults if tables don’t exist yet) ----
+  // ---- Stats ----
   const [
     usersCountRes,
     plansCountRes,
@@ -82,6 +90,12 @@ export default async function AdminHomePage() {
     wdCountRes,
     pendingWdRes,
     successTxRes,
+
+    // ✅ payouts summary via RPC
+    payoutsSummaryRes,
+
+    // ✅ recent payouts rows
+    recentPayoutsRes,
   ] = await Promise.all([
     supabase.from('users').select('id', { count: 'exact', head: true }),
     supabase
@@ -97,6 +111,15 @@ export default async function AdminHomePage() {
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'success'),
+
+    // If function doesn't exist yet, this will error — we'll handle safely below
+    supabase.rpc('admin_payouts_today_summary'),
+
+    supabase
+      .from('investment_payouts')
+      .select('id,created_at,amount,user_id,investment_id')
+      .order('created_at', { ascending: false })
+      .limit(6),
   ])
 
   const usersCount = usersCountRes.count ?? 0
@@ -105,6 +128,20 @@ export default async function AdminHomePage() {
   const wdCount = wdCountRes.count ?? 0
   const pendingWithdrawals = pendingWdRes.count ?? 0
   const successfulTx = successTxRes.count ?? 0
+
+  // ✅ payouts today summary (safe defaults if rpc/table not ready)
+  const payoutSummaryRow = Array.isArray(payoutsSummaryRes.data)
+    ? payoutsSummaryRes.data[0]
+    : null
+
+  const totalPaidToday = Number(payoutSummaryRow?.total_paid_today ?? 0)
+  const payoutsCountToday = Number(payoutSummaryRow?.payouts_count_today ?? 0)
+  const usersCreditedToday = Number(payoutSummaryRow?.users_credited_today ?? 0)
+  const investmentsPaidToday = Number(
+    payoutSummaryRow?.investments_paid_today ?? 0
+  )
+
+  const recentPayouts = (recentPayoutsRes.data || []) as PayoutRow[]
 
   // ---- Recent activity ----
   const [recentTxRes, recentWdRes] = await Promise.all([
@@ -260,6 +297,38 @@ export default async function AdminHomePage() {
           </div>
         </Card>
 
+        {/* ✅ NEW: Returns paid today */}
+        <Card className='p-5 rounded-2xl'>
+          <div className='flex items-center justify-between'>
+            <div className='space-y-1'>
+              <div className='text-sm text-slate-600'>Returns paid today</div>
+              <div className='text-2xl font-bold'>{fmtNGN(totalPaidToday)}</div>
+
+              <div className='text-xs text-slate-500'>
+                {payoutsCountToday} payouts • {usersCreditedToday} users •{' '}
+                {investmentsPaidToday} investments
+              </div>
+            </div>
+
+            <div className='h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center'>
+              <Coins className='h-5 w-5 text-slate-700' />
+            </div>
+          </div>
+
+          <div className='mt-4 flex gap-2'>
+            <Link href='/admin/payouts'>
+              <Button size='sm' variant='outline'>
+                View payouts
+              </Button>
+            </Link>
+            <Link href='/admin/investments'>
+              <Button size='sm' variant='ghost'>
+                Active investments
+              </Button>
+            </Link>
+          </div>
+        </Card>
+
         <Card className='p-5 rounded-2xl'>
           <div className='flex items-center justify-between'>
             <div className='space-y-1'>
@@ -314,6 +383,64 @@ export default async function AdminHomePage() {
           </div>
         </Card>
       </div>
+
+      {/* ✅ Recent payouts panel */}
+      <Card className='p-5 rounded-2xl'>
+        <div className='flex items-center justify-between'>
+          <div>
+            <h2 className='text-lg font-semibold'>Recent returns payouts</h2>
+            <p className='text-sm text-slate-600'>
+              Latest balance credits from active investments.
+            </p>
+          </div>
+
+          <Link href='/admin/payouts'>
+            <Button size='sm' variant='outline'>
+              View all
+            </Button>
+          </Link>
+        </div>
+
+        <Separator className='my-4' />
+
+        {recentPayouts.length === 0 ? (
+          <p className='text-sm text-slate-600'>No payout logs yet.</p>
+        ) : (
+          <div className='space-y-3'>
+            {recentPayouts.map((p) => (
+              <div
+                key={p.id}
+                className='flex items-start justify-between gap-3 rounded-xl border bg-white p-3'
+              >
+                <div className='min-w-0'>
+                  <div className='flex items-center gap-2'>
+                    <Clock3 className='h-4 w-4 text-slate-600' />
+                    <div className='font-medium text-sm truncate'>
+                      User: {p.user_id.slice(0, 8)}…
+                    </div>
+                    <Badge variant='secondary'>credited</Badge>
+                  </div>
+
+                  <div className='text-xs text-slate-500 mt-1 truncate'>
+                    Investment: {p.investment_id.slice(0, 8)}…
+                  </div>
+
+                  <div className='text-xs text-slate-500 mt-1'>
+                    {new Date(p.created_at).toLocaleString()}
+                  </div>
+                </div>
+
+                <div className='text-right shrink-0'>
+                  <div className='font-semibold text-sm text-green-700'>
+                    {fmtNGN(Number(p.amount ?? 0))}
+                  </div>
+                  <div className='text-xs text-slate-500'>daily return</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Recent Activity */}
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
@@ -458,6 +585,9 @@ export default async function AdminHomePage() {
             </Link>
             <Link href='/admin/referrals'>
               <Button variant='outline'>Referrals</Button>
+            </Link>
+            <Link href='/admin/payouts'>
+              <Button variant='outline'>Payouts</Button>
             </Link>
           </div>
         </div>
