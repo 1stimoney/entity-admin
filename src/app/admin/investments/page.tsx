@@ -189,7 +189,7 @@ export default async function AdminInvestmentsPage(props: {
       {/* Header */}
       <div className='flex items-start justify-between gap-4'>
         <div>
-          <Link href='/admin'>
+          <Link href='/admin/payouts'>
             <Button variant='ghost' size='sm' className='gap-2'>
               <ArrowLeft className='h-4 w-4' />
               Back
