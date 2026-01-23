@@ -32,19 +32,19 @@ export default function AdminWithdrawalsPage() {
     return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(s))
   }, [rows, q])
 
-  const act = async (id: string, action: 'approve' | 'deny') => {
+  const act = async (id: string, action: 'approved' | 'failed') => {
     const res = await fetch('/api/admin/withdrawals/action', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id,
         action,
-        reason: action === 'deny' ? reason : undefined,
+        reason: action === 'failed' ? reason : undefined,
       }),
     })
     const json = await res.json()
     if (!json.status) return toast.error(json.message || 'Action failed')
-    toast.success(`Withdrawal ${action}d`)
+    toast.success(`Withdrawal ${action}`)
     load()
   }
 
@@ -110,10 +110,10 @@ export default function AdminWithdrawalsPage() {
                 </div>
 
                 <div className='flex gap-2'>
-                  <Button variant='outline' onClick={() => act(w.id, 'deny')}>
+                  <Button variant='outline' onClick={() => act(w.id, 'failed')}>
                     Deny
                   </Button>
-                  <Button onClick={() => act(w.id, 'approve')}>Approve</Button>
+                  <Button onClick={() => act(w.id, 'approved')}>Approve</Button>
                 </div>
               </div>
             </Card>
