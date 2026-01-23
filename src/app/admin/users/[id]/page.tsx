@@ -88,7 +88,7 @@ export default async function AdminUserDetailsPage({
     supabaseAdmin
       .from('transactions')
       .select(
-        'id,user_id,user_email,type,amount,status,flutterwave_ref,created_at,plan_id,package_id,note,provider_ref,provider_transaction_id'
+        'id,user_id,user_email,type,amount,status,flutterwave_ref,created_at,plan_id'
       )
       .or(`user_id.eq.${id},user_email.eq.${userRow.email ?? ''}`)
       .order('created_at', { ascending: false })
