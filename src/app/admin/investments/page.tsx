@@ -2,7 +2,6 @@
 // app/admin/investments/page.tsx
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
 import {
   ArrowLeft,
   Search,
@@ -18,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 const PER_PAGE = 20
 const VALIDITY_DAYS = 30
@@ -132,27 +132,13 @@ export default async function AdminInvestmentsPage(props: {
   const tab = (searchParams.tab ?? 'all') as 'all' | 'active' | 'expired'
   const page = Math.max(0, Number(searchParams.page ?? 0))
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
-
   // ---------- Load investments ----------
   const from = page * PER_PAGE
   const to = from + PER_PAGE - 1
 
   // NOTE: select optional fields if they exist in your table.
   // If your table doesn't have start_at/end_at/daily_return/last_paid_at, Supabase returns nulls (fine).
-  const invRes = await supabase
+  const invRes = await supabaseAdmin
     .from('investments')
     .select(
       'id,created_at,amount,package_id,user_id,status,source_transaction_id,start_at,end_at,daily_return,last_paid_at',
@@ -171,13 +157,13 @@ export default async function AdminInvestmentsPage(props: {
 
   const [usersRes, plansRes] = await Promise.all([
     userIds.length
-      ? supabase
+      ? supabaseAdmin
           .from('users')
           .select('id,email,first_name,last_name')
           .in('id', userIds)
       : Promise.resolve({ data: [] as any[] }),
     planIds.length
-      ? supabase
+      ? supabaseAdmin
           .from('investment_plans')
           .select('id,name,amount,daily_return')
           .in('id', planIds)
@@ -196,7 +182,7 @@ export default async function AdminInvestmentsPage(props: {
 
   if (invIds.length) {
     // Try to read payout_date first; if your table doesn't have it, created_at still exists.
-    const payoutsRes = await supabase
+    const payoutsRes = await supabaseAdmin
       .from('investment_payouts')
       .select('investment_id, amount, created_at, payout_date')
       .in('investment_id', invIds)

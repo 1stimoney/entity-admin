@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { supabase } from '@/lib/supabases'
 
 const PER_PAGE = 20
 
@@ -98,20 +99,6 @@ export default async function AdminTransactionsPage(props: {
     | 'success'
     | 'failed'
   const page = Math.max(0, Number(searchParams.page ?? 0))
-
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
 
   const from = page * PER_PAGE
   const to = from + PER_PAGE - 1

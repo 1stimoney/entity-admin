@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { supabase } from '@/lib/supabases'
 
 type UserRow = {
   id: string
@@ -87,21 +88,6 @@ export default async function AdminUsersPage({
 }: {
   searchParams?: { q?: string; page?: string }
 }) {
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
-
   const sp = (await searchParams) ?? {}
   const q = (sp.q ?? '').trim()
   const page = Math.max(0, Number(sp.page ?? 0))

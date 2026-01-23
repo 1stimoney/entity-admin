@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/admin/transactions/actions/route.ts
 import { NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabaseServer'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 function normalizePlanId(t: any) {
   return (t?.package_id ?? t?.plan_id) as string | null
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     }
 
     // Load transaction
-    const { data: tx, error: txErr } = await supabaseServer
+    const { data: tx, error: txErr } = await supabaseAdmin
       .from('transactions')
       .select('*')
       .eq('id', transaction_id)
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
     if (action === 'mark_failed') {
       // Mark tx failed
-      await supabaseServer
+      await supabaseAdmin
         .from('transactions')
         .update({ status: 'failed' })
         .eq('id', transaction_id)
@@ -47,13 +47,13 @@ export async function POST(req: Request) {
 
     if (action === 'mark_success') {
       // 1) mark tx success
-      await supabaseServer
+      await supabaseAdmin
         .from('transactions')
         .update({ status: 'success' })
         .eq('id', transaction_id)
 
       // 2) ensure investment exists (idempotent)
-      const { data: existingInv } = await supabaseServer
+      const { data: existingInv } = await supabaseAdmin
         .from('investments')
         .select('id')
         .eq('source_transaction_id', transaction_id)
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       }
 
       // Load plan (for daily_return and canonical amount)
-      const { data: plan, error: planErr } = await supabaseServer
+      const { data: plan, error: planErr } = await supabaseAdmin
         .from('investment_plans')
         .select('id, amount, daily_return')
         .eq('id', planId)
@@ -84,19 +84,17 @@ export async function POST(req: Request) {
       const start_at = new Date()
       const end_at = new Date(start_at.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-      const { error: invErr } = await supabaseServer
-        .from('investments')
-        .insert({
-          user_id: tx.user_id,
-          package_id: plan.id,
-          amount: Number(plan.amount),
-          source_transaction_id: transaction_id,
-          status: 'active',
-          start_at: start_at.toISOString(),
-          end_at: end_at.toISOString(),
-          daily_return: Number(plan.daily_return ?? 0),
-          last_paid_at: null,
-        })
+      const { error: invErr } = await supabaseAdmin.from('investments').insert({
+        user_id: tx.user_id,
+        package_id: plan.id,
+        amount: Number(plan.amount),
+        source_transaction_id: transaction_id,
+        status: 'active',
+        start_at: start_at.toISOString(),
+        end_at: end_at.toISOString(),
+        daily_return: Number(plan.daily_return ?? 0),
+        last_paid_at: null,
+      })
 
       if (invErr) {
         console.error('create investment error', invErr)

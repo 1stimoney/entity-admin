@@ -3,7 +3,6 @@
 // app/admin/payouts/page.tsx
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
 import {
   Coins,
   ArrowLeft,
@@ -16,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 const PER_PAGE = 20
 
@@ -84,20 +84,6 @@ export default async function AdminPayoutsPage(props: {
   const range = (searchParams.range ?? '7d') as 'today' | '7d' | '30d' | 'all'
   const page = Math.max(0, Number(searchParams.page ?? 0))
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
-
   // ---- date filter ----
   let fromISO: string | null = null
   if (range === 'today') fromISO = daysAgoISO(0)
@@ -108,11 +94,11 @@ export default async function AdminPayoutsPage(props: {
   // ---- summary: today + last 7 days (use payout_date where possible) ----
   // If you only have created_at, keep created_at. But payout_date is the better “day”.
   const [todayAgg, weekAgg] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('investment_payouts')
       .select('amount,created_at,payout_date')
       .gte('created_at', daysAgoISO(0)),
-    supabase
+    supabaseAdmin
       .from('investment_payouts')
       .select('amount,created_at,payout_date')
       .gte('created_at', daysAgoISO(7)),
@@ -136,7 +122,7 @@ export default async function AdminPayoutsPage(props: {
     const qLower = q.toLowerCase()
 
     // Pull a limited list of matching users (admin scale)
-    const { data: matchUsers } = await supabase
+    const { data: matchUsers } = await supabaseAdmin
       .from('users')
       .select('id,email,first_name,last_name')
       .limit(2000)
@@ -156,7 +142,7 @@ export default async function AdminPayoutsPage(props: {
   const from = page * PER_PAGE
   const to = from + PER_PAGE - 1
 
-  let payoutsQuery = supabase
+  let payoutsQuery = supabaseAdmin
     .from('investment_payouts')
     .select('id,created_at,payout_date,amount,user_id,investment_id', {
       count: 'exact',
@@ -292,7 +278,7 @@ export default async function AdminPayoutsPage(props: {
   const userIds = Array.from(new Set(payouts.map((p) => p.user_id)))
   let usersMap: Record<string, UserRow> = {}
   if (userIds.length) {
-    const usersRes = await supabase
+    const usersRes = await supabaseAdmin
       .from('users')
       .select('id,email,first_name,last_name')
       .in('id', userIds)
@@ -308,7 +294,7 @@ export default async function AdminPayoutsPage(props: {
   let planIds: string[] = []
 
   if (invIds.length) {
-    const invRes = await supabase
+    const invRes = await supabaseAdmin
       .from('investments')
       .select('id,user_id,package_id')
       .in('id', invIds)
@@ -324,7 +310,7 @@ export default async function AdminPayoutsPage(props: {
 
   let plansMap: Record<string, PlanRow> = {}
   if (planIds.length) {
-    const plansRes = await supabase
+    const plansRes = await supabaseAdmin
       .from('investment_plans')
       .select('id,name,daily_return')
       .in('id', planIds)

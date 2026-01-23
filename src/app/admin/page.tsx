@@ -1,7 +1,6 @@
 // app/admin/page.tsx
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -19,6 +18,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 type TxRow = {
   id: string
@@ -67,21 +67,6 @@ function statusBadgeVariant(s: string) {
 }
 
 export default async function AdminHomePage() {
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
-
   // ---- Stats ----
   const [
     usersCountRes,
@@ -97,25 +82,29 @@ export default async function AdminHomePage() {
     // ✅ recent payouts rows
     recentPayoutsRes,
   ] = await Promise.all([
-    supabase.from('users').select('id', { count: 'exact', head: true }),
-    supabase
+    supabaseAdmin.from('users').select('id', { count: 'exact', head: true }),
+    supabaseAdmin
       .from('investment_plans')
       .select('id', { count: 'exact', head: true }),
-    supabase.from('transactions').select('id', { count: 'exact', head: true }),
-    supabase.from('withdrawals').select('id', { count: 'exact', head: true }),
-    supabase
+    supabaseAdmin
+      .from('transactions')
+      .select('id', { count: 'exact', head: true }),
+    supabaseAdmin
+      .from('withdrawals')
+      .select('id', { count: 'exact', head: true }),
+    supabaseAdmin
       .from('withdrawals')
       .select('id', { count: 'exact', head: true })
       .in('status', ['initiated', 'processing', 'pending']),
-    supabase
+    supabaseAdmin
       .from('transactions')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'success'),
 
     // If function doesn't exist yet, this will error — we'll handle safely below
-    supabase.rpc('admin_payouts_today_summary'),
+    supabaseAdmin.rpc('admin_payouts_today_summary'),
 
-    supabase
+    supabaseAdmin
       .from('investment_payouts')
       .select('id,created_at,amount,user_id,investment_id')
       .order('created_at', { ascending: false })
@@ -145,14 +134,14 @@ export default async function AdminHomePage() {
 
   // ---- Recent activity ----
   const [recentTxRes, recentWdRes] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('transactions')
       .select(
         'id,user_id,user_email,type,amount,status,created_at,flutterwave_ref'
       )
       .order('created_at', { ascending: false })
       .limit(6),
-    supabase
+    supabaseAdmin
       .from('withdrawals')
       .select(
         'id,user_id,email,amount,status,created_at,flutterwave_ref,bank_name'

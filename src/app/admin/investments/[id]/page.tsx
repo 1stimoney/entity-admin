@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { supabase } from '@/lib/supabases'
 
 const VALIDITY_DAYS = 30
 
@@ -85,20 +86,6 @@ export default async function AdminInvestmentDetailPage(props: {
   params: Promise<{ id: string }>
 }) {
   const { id } = await props.params
-
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll() {},
-      },
-    }
-  )
 
   // 1) Fetch investment
   const invRes = await supabase
